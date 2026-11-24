@@ -1,8 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Upload, FileJson, AlertTriangle } from 'lucide-react';
+import { importCapture, MAX_CAPTURE_BYTES, type ImportStage } from '../services/captureService';
+import type { CaptureData } from '../types';
 
 interface UploadSectionProps {
-  onDataLoaded: (data: any) => void;
+  onDataLoaded: (data: CaptureData) => void;
   isLoading: boolean;
 }
 
@@ -10,34 +12,46 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onDataLoaded, isLoading }
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = (file: File) => {
-    if (file.type !== "application/json" && !file.name.endsWith('.json')) {
-      setError("Por favor, envie um arquivo JSON exportado do Wireshark.");
+  const [isReading, setIsReading] = useState(false);
+  const reading = useRef(false);
+  const controller = useRef<AbortController | null>(null);
+  const [stage, setStage] = useState<ImportStage>('reading');
+  useEffect(() => () => controller.current?.abort(), []);
+  const busy = isLoading || isReading;
+
+  const handleFile = async (file?: File) => {
+    if (!file || reading.current || isLoading) return;
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setError('Envie um arquivo JSON exportado do Wireshark.');
       return;
     }
+    if (file.size > MAX_CAPTURE_BYTES) {
+      setError('O limite de importação é 250 MB por arquivo.');
+      return;
+    }
+    reading.current = true;
+    setIsReading(true);
     setError(null);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const json = JSON.parse(e.target?.result as string);
-        if (!Array.isArray(json)) {
-          throw new Error("Formato inválido. Esperado um array de pacotes.");
-        }
-        onDataLoaded(json);
-      } catch (err) {
-        setError("Erro ao ler o arquivo JSON. Certifique-se que foi exportado corretamente do Wireshark.");
-      }
-    };
-    reader.readAsText(file);
+    const request = new AbortController();
+    controller.current = request;
+    setStage('reading');
+    try {
+      const data = await importCapture(file, request.signal, setStage);
+      if (!request.signal.aborted) onDataLoaded(data);
+    } catch (err) {
+      if (!request.signal.aborted) setError(err instanceof Error ? err.message : 'Não foi possível ler o arquivo.');
+    } finally {
+      reading.current = false;
+      setIsReading(false);
+      controller.current = null;
+    }
   };
 
-  const onDrop = useCallback((e: React.DragEvent) => {
+  const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  }, []);
+    void handleFile(e.dataTransfer.files[0]);
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 animate-fade-in">
@@ -56,13 +70,17 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onDataLoaded, isLoading }
             ? 'border-cyan-400 bg-cyan-400/10' 
             : 'border-slate-700 bg-slate-800/50 hover:border-cyan-500/50'
           }`}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragOver={(e) => { e.preventDefault(); if (!busy) setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
       >
         <div className="flex flex-col items-center text-center space-y-4">
-            {isLoading ? (
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-400"></div>
+            {busy ? (
+                <div role="status" className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-400"></div>
+                    <p className="text-slate-300">{stage === 'reading' ? 'Lendo arquivo…' : 'Processando pacotes…'}</p>
+                    <button className="text-sm text-cyan-300 underline" onClick={() => controller.current?.abort()}>Cancelar importação</button>
+                </div>
             ) : (
                 <>
                     <div className="p-4 rounded-full bg-slate-800 ring-1 ring-slate-700">
@@ -78,9 +96,11 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onDataLoaded, isLoading }
                         </span>
                         <input 
                             type="file" 
-                            className="hidden" 
+                            className="sr-only" 
+                            aria-label="Selecionar arquivo JSON do Wireshark"
+                            disabled={busy}
                             accept=".json" 
-                            onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+                            onChange={(e) => { void handleFile(e.target.files?.[0]); e.target.value = ''; }}
                         />
                     </label>
                 </>
@@ -89,7 +109,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onDataLoaded, isLoading }
       </div>
 
       {error && (
-        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-200">
+        <div role="alert" className="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-200">
           <AlertTriangle className="w-5 h-5" />
           <span>{error}</span>
         </div>
@@ -104,7 +124,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onDataLoaded, isLoading }
             <li>Abra sua captura (.pcap) no Wireshark.</li>
             <li>Vá em <span className="text-cyan-300 font-mono">File &gt; Export Packet Dissections &gt; As JSON...</span></li>
             <li>Salve o arquivo e arraste-o para a área acima.</li>
-            <li>Recomendamos arquivos menores que 50MB para melhor performance no navegador.</li>
+            <li>Limite: 250 MB por arquivo. O tempo depende do tamanho da captura.</li>
         </ol>
       </div>
     </div>

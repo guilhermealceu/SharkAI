@@ -48,13 +48,32 @@ export interface ProcessedPacket {
   protocol: string;
   length: number;
   info: string;
-  raw: any;
+  timestamp: number | null;
+  retransmission: boolean;
+  dnsError: boolean;
+  tcpAnalysisAvailable: boolean;
+  dnsResponseAvailable: boolean;
+}
+
+export interface CaptureData {
+  packets: ProcessedPacket[];
+  stats: NetworkStats;
 }
 
 export interface NetworkStats {
   totalPackets: number;
   protocolCounts: { name: string; value: number }[];
-  topTalkers: { ip: string; count: number }[];
+  topTalkers: { ip: string; count: number; bytes: number; sentBytes: number; receivedBytes: number }[];
+  totalBytes: number;
+  durationSeconds: number | null;
+  averageBitsPerSecond: number | null;
+  timedPackets: number;
+  timeline: { seconds: number; packets: number; bytes: number; bitsPerSecond: number }[];
+  bucketSeconds: number;
+  retransmissions: number;
+  tcpAnalysisPackets: number;
+  dnsErrors: number;
+  dnsResponses: number;
   startTime: string;
   endTime: string;
   suspiciousIPs: string[];

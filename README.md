@@ -1,63 +1,55 @@
-# 🦈 SharkAI - Analisador de Rede Inteligente
+# SharkAI
 
-O **SharkAI** é uma ferramenta moderna e poderosa para análise de tráfego de rede que combina a precisão do Wireshark com a inteligência do Google Gemini. Importe seus arquivos de captura, visualize estatísticas detalhadas e receba insights automáticos sobre segurança e anomalias.
+Analisa capturas do **Wireshark** no navegador: protocolos, IPs, linha do tempo, retransmissões e erros de DNS. Também gera um relatório em linguagem simples com IA.
 
-![SharkAI Preview](https://picsum.photos/seed/sharkai/1200/600)
+> 📸 _Print do painel de análise_
 
-## 🚀 Funcionalidades
+## Sobre
 
-- **📁 Importação Simplificada**: Suporte total para arquivos JSON exportados diretamente do Wireshark.
-- **📊 Dashboard Interativo**: Visualização de distribuição de protocolos e "Top Talkers" (IPs mais ativos) usando gráficos dinâmicos.
-- **🛡️ Análise com IA**: Integração com o modelo **Gemini 3 Flash** para detectar anomalias, explicar protocolos e sugerir melhorias de segurança.
-- **🔍 Filtro em Tempo Real**: Busque por IPs, protocolos ou informações específicas na lista de pacotes.
-- **💡 Foco Personalizado**: Peça para a IA analisar problemas específicos (ex: "Por que meu Wi-Fi está lento?" ou "Investigar tráfego na porta 443").
-- **🌑 Interface Cyberpunk**: Design escuro otimizado para profissionais de TI e entusiastas de segurança.
+Abrir uma captura grande no Wireshark e descobrir o que está errado exige experiência: filtrar protocolos, seguir conversas, achar retransmissões. O SharkAI importa a captura exportada em JSON, organiza tudo num painel com gráficos e filtros e, quando você pede, usa IA para explicar o que está acontecendo na rede e onde investigar.
 
-## 🛠️ Tecnologias Utilizadas
+## Funcionalidades
 
-- **Frontend**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- **Estilização**: [Tailwind CSS](https://tailwindcss.com/)
-- **IA**: [Google Gemini API (@google/genai)](https://ai.google.dev/)
-- **Gráficos**: [Recharts](https://recharts.org/)
-- **Ícones**: [Lucide React](https://lucide.dev/)
-- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Importação de capturas JSON** de até 250 MB, processadas em segundo plano (Web Worker), com opção de cancelar
+- **Painel da captura**: volume, duração, taxa média, principais protocolos e IPs
+- **Lista de pacotes** com busca e paginação. Clique num protocolo, IP ou indicador para filtrar
+- **Linha do tempo** com escala de horário única (epoch, relativo ou texto)
+- **Indicadores de problema**: retransmissões TCP e erros de DNS
+- Suporte a IPv4, IPv6 e Ethernet
+- **Análise com IA** via Groq (`openai/gpt-oss-120b`), com um foco opcional informado por você
 
-## 📖 Como Usar
+## Requisitos
 
-### 1. Exportando do Wireshark
-Para usar o SharkAI, você precisa exportar sua captura do Wireshark no formato JSON:
-1. Abra seu arquivo `.pcap` ou faça uma captura ao vivo no Wireshark.
-2. Vá em **File > Export Packet Dissections > As JSON...**
-3. Salve o arquivo.
-4. Arraste e solte o arquivo salvo na tela inicial do SharkAI.
+- Node.js 22+ (os testes usam `--experimental-strip-types`)
+- Uma chave do [Groq](https://console.groq.com/keys) (opcional), só para a análise com IA
 
-### 2. Configuração da API Key
-Para habilitar a análise inteligente, você precisa de uma chave de API do Google Gemini:
-1. Obtenha sua chave em [Google AI Studio](https://aistudio.google.com/).
-2. Crie um arquivo `.env` na raiz do projeto (ou use as configurações do ambiente).
-3. Adicione a chave: `GEMINI_API_KEY=sua_chave_aqui`.
+## Como rodar
 
-### 3. Instalação e Execução
 ```bash
-# Instalar dependências
 npm install
-
-# Iniciar servidor de desenvolvimento
 npm run dev
-
-# Gerar build de produção
-npm run build
 ```
 
-## 📂 Estrutura do Projeto
+Abra http://localhost:3000. Para produção: `npm run build && npm run preview`.
 
-- `/components`: Componentes de UI (Dashboard, Upload, etc).
-- `/services`: Integração com a API do Gemini.
-- `/utils`: Utilitários para parsing de pacotes e cálculos.
-- `/types.ts`: Definições de tipos TypeScript para os pacotes do Wireshark.
+Para validar: `npm run lint`, `npm test` e `npm run build`.
 
-## 🛡️ Segurança e Privacidade
-O processamento dos pacotes ocorre localmente no seu navegador. Apenas um resumo estatístico e uma pequena amostra de pacotes (sem dados sensíveis de payload, apenas cabeçalhos) são enviados para a API do Gemini para análise, garantindo que seus dados permaneçam seguros.
+### Exportando a captura
 
----
-Desenvolvido com ❤️ para a comunidade de Redes e Segurança.
+No Wireshark: **File → Export Packet Dissections → As JSON**. Arquivos PCAP precisam ser exportados assim antes de importar.
+
+## Privacidade
+
+A importação, os gráficos e os filtros rodam no seu navegador. A chave do Groq fica só na memória da página: não vai para o build, não é salva no navegador e some ao recarregar. Quando você pede a análise com IA, o SharkAI envia ao Groq um resumo da captura: estatísticas, IPs, horários, protocolos e uma amostra de até 30 pacotes. Não use a análise com IA em capturas com dados que não podem sair da sua rede.
+
+> A interface carrega o Tailwind CSS por CDN, então precisa de internet para aparecer estilizada.
+
+## Autor
+
+Criado por **Guilherme Dill** · [RUNE Projects](https://www.runeprojects.com.br) · [GitHub](https://github.com/guilhermealceu)
+
+## Licença
+
+[MIT](LICENSE)
+
+<sub>Wireshark é marca registrada da Wireshark Foundation. Este projeto é independente e não tem vínculo com o Wireshark.</sub>

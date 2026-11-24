@@ -1,56 +1,62 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import UploadSection from './components/UploadSection';
 import Dashboard from './components/Dashboard';
-import { parseWiresharkJSON } from './utils/packetUtils';
-import { analyzeNetworkTraffic } from './services/geminiService';
-import { AppState, NetworkStats, ProcessedPacket } from './types';
+import { samplePackets } from './utils/packetUtils';
+import { analyzeNetworkTraffic } from './services/groqService';
+import { AppState, NetworkStats, ProcessedPacket, CaptureData } from './types';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
   const [packets, setPackets] = useState<ProcessedPacket[]>([]);
   const [stats, setStats] = useState<NetworkStats | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   
   // AI State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
 
-  const handleDataLoaded = (jsonData: any[]) => {
-    setIsLoading(true);
-    // Simulate slight delay for processing UX
-    setTimeout(() => {
-      const { packets: parsedPackets, stats: parsedStats } = parseWiresharkJSON(jsonData);
-      setPackets(parsedPackets);
-      setStats(parsedStats);
-      setAppState(AppState.DASHBOARD);
-      setIsLoading(false);
-    }, 800);
+  const [apiKey, setApiKey] = useState('');
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const analysisController = useRef<AbortController | null>(null);
+
+  const handleDataLoaded = ({ packets: parsedPackets, stats: parsedStats }: CaptureData) => {
+    setPackets(parsedPackets);
+    setStats(parsedStats);
+    setAppState(AppState.DASHBOARD);
   };
 
-  const handleAnalyze = async (focus: string = "") => {
-    if (!stats || packets.length === 0) return;
+  const handleAnalyze = async (focus = '') => {
+    if (!stats || !packets.length || analysisController.current) return;
+    const controller = new AbortController();
+    analysisController.current = controller;
     setIsAnalyzing(true);
-    
-    // Create a sample of packets: first 15 + 15 random ones from the middle
-    const sample = [
-        ...packets.slice(0, 15),
-        ...packets.sort(() => 0.5 - Math.random()).slice(0, 15)
-    ];
-
-    const result = await analyzeNetworkTraffic(stats, sample, focus);
-    setAnalysisResult(result);
-    setIsAnalyzing(false);
+    setAnalysisError(null);
+    try {
+      const result = await analyzeNetworkTraffic(stats, samplePackets(packets), focus, apiKey, controller.signal);
+      if (!controller.signal.aborted) setAnalysisResult(result);
+    } catch (error) {
+      if (!controller.signal.aborted) setAnalysisError(error instanceof Error ? error.message : 'Falha na análise.');
+    } finally {
+      if (analysisController.current === controller) {
+        analysisController.current = null;
+        setIsAnalyzing(false);
+      }
+    }
   };
 
   const handleResetAnalysis = () => {
     setAnalysisResult(null);
+    setAnalysisError(null);
   };
 
   const handleReset = () => {
+    analysisController.current?.abort();
+    analysisController.current = null;
+    setIsAnalyzing(false);
     setAppState(AppState.UPLOAD);
     setPackets([]);
     setStats(null);
     setAnalysisResult(null);
+    setAnalysisError(null);
   };
 
   return (
@@ -87,17 +93,20 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="relative">
+      <main className="relative overflow-x-clip">
         {/* Background Gradients */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
         {appState === AppState.UPLOAD && (
-          <UploadSection onDataLoaded={handleDataLoaded} isLoading={isLoading} />
+          <UploadSection onDataLoaded={handleDataLoaded} isLoading={false} />
         )}
 
         {appState === AppState.DASHBOARD && stats && (
           <Dashboard 
+            apiKey={apiKey}
+            onApiKeyChange={setApiKey}
+            analysisError={analysisError}
             stats={stats} 
             packets={packets} 
             onAnalyze={handleAnalyze} 

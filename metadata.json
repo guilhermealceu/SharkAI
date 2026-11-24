@@ -1,5 +1,0 @@
-{
-  "name": "SharkAI - Analisador de Wireshark",
-  "description": "Importe seus arquivos JSON do Wireshark e receba análises detalhadas, detecção de anomalias e explicações simplificadas usando Inteligência Artificial.",
-  "requestFramePermissions": []
-}
