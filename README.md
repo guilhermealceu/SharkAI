@@ -2,7 +2,7 @@
 
 Analisa capturas do **Wireshark** no navegador: protocolos, IPs, linha do tempo, retransmissões e erros de DNS. Também gera um relatório em linguagem simples com IA.
 
-> 📸 _Print do painel de análise_
+![Visão geral de uma captura no SharkAI](docs/dashboard.jpg)
 
 ## Sobre
 
@@ -17,6 +17,12 @@ Abrir uma captura grande no Wireshark e descobrir o que está errado exige exper
 - **Indicadores de problema**: retransmissões TCP e erros de DNS
 - Suporte a IPv4, IPv6 e Ethernet
 - **Análise com IA** via Groq (`openai/gpt-oss-120b`), com um foco opcional informado por você
+
+## Telas
+
+<table>
+<tr><td width="60%" align="center"><img src="docs/importar.jpg" alt="Importação do JSON exportado pelo Wireshark" /><br /><sub>Importação do JSON exportado pelo Wireshark</sub></td><td width="40%" align="center"><img src="docs/analise-ia.jpg" alt="Análise com IA" width="300" /><br /><sub>Análise com IA</sub></td></tr>
+</table>
 
 ## Requisitos
 
